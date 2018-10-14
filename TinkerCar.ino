@@ -1,14 +1,21 @@
 #include "Servo.h"
 #include "FlySkyIBus.h" // https://github.com/aanon4/FlySkyIBus
 
-#define MOTOR_MID         88
-#define SERVO_MID         90
-#define SUPER_RATE        1.8
-#define THROTTLE_LOWPASS  63  // 2 ** n -1
+#define MOTOR_MID               89
+#define SERVO_MID               90
+#define SERVO_F_MAX_ANGLE       160 // 90 - 180
+#define SERVO_F_MIN_ANGLE       20  // 0 - 90
+#define SERVO_B_MAX_ANGLE       110 // 90 - 180
+#define SERVO_B_MIN_ANGLE       70  // 0 - 90
+#define MOTOR_MAX_FORWARD       130 // 90 - 180
+#define MOTOR_MAX_BACKWARD      80  // 0 - 90
+//#define SUPER_RATE            1.8
+#define THROTTLE_LOWPASS        63  // 2 ** n -1
 
 Servo motorR;
 Servo motorL;
-Servo servo;
+Servo servoFront;
+Servo servoBack;
 
 enum {
   DISARMED,
@@ -18,26 +25,31 @@ enum {
 
 int state;
 int prev_throttle;
-long min, max;
+//long min, max;
 
 void setup() 
 {
+  pinMode(2, OUTPUT);
+  digitalWrite(2, HIGH);
+  
   Serial.begin(115200);
   IBus.begin(Serial);
 
   motorR.attach(9, 1000, 2000);
   motorL.attach(10, 1000, 2000);
-  servo.attach(11, 1000, 2000);
+  servoFront.attach(11, 1000, 2000);
+  servoBack.attach(3, 1000, 2000);
 
   motorR.write(MOTOR_MID);
   motorL.write(MOTOR_MID);
-  servo.write(SERVO_MID);
+  servoFront.write(SERVO_MID);
+  servoBack.write(SERVO_MID);
 
   state = DISARMED;
-  prev_throttle = 0;
+  prev_throttle = 1000;
 
-  max = pow(500, SUPER_RATE);
-  min = -max;
+  //max = pow(500, SUPER_RATE);
+  //min = -max;
 }
 
 void loop() 
@@ -77,13 +89,13 @@ void loop()
 
     // forward
     if(dir > 1700) {
-      motorL.write(map(throttleL, 1000, 2000, MOTOR_MID, 180));
-      motorR.write(map(throttleR, 1000, 2000, MOTOR_MID, 180));
+      motorL.write(map(throttleL, 1000, 2000, MOTOR_MID, MOTOR_MAX_FORWARD));
+      motorR.write(map(throttleR, 1000, 2000, MOTOR_MID, MOTOR_MAX_FORWARD));
     }
     // reverse
     else if(dir < 1300) {
-      motorL.write(map(throttleL, 1000, 2000, MOTOR_MID, 0));
-      motorR.write(map(throttleR, 1000, 2000, MOTOR_MID, 0));
+      motorL.write(map(throttleL, 1000, 2000, MOTOR_MID, MOTOR_MAX_BACKWARD));
+      motorR.write(map(throttleR, 1000, 2000, MOTOR_MID, MOTOR_MAX_BACKWARD));
     }
     // neutral
     else {
@@ -92,14 +104,23 @@ void loop()
     }
 
     // makes steering non-linear, less sensitive close to mid-stick position
-    double expo = steering - 1500;
-    expo = pow(abs(expo), SUPER_RATE);
-    if(steering < 1500) expo = -expo;
+    //double expoFront = steering - 1500;
+    //double expoBack = (steering - 1500) / 2;
     
-    servo.write(map(expo, min, max, 10, 170));
+    //expoFront = pow(abs(expoFront), SUPER_RATE);
+    //expoBack = pow(abs(expoBack), SUPER_RATE);
+    
+    //if(steering < 1500) {
+    //  expoFront = -expoFront;
+    //  expoBack = -expoBack;
+    //}
+
+    servoFront.write(map(steering, 1000, 2000, SERVO_F_MIN_ANGLE, SERVO_F_MAX_ANGLE));
+    servoBack.write(map(steering, 1000, 2000, SERVO_B_MIN_ANGLE, SERVO_B_MAX_ANGLE));
   }
   else {
-    servo.write(SERVO_MID);
+    servoFront.write(SERVO_MID);
+    servoBack.write(SERVO_MID);
     motorL.write(MOTOR_MID);
     motorR.write(MOTOR_MID);
   }
